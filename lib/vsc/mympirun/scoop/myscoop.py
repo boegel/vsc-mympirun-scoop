@@ -49,7 +49,13 @@ except:
     _logger.raiseException("MYSCOOP requires the scoop module and scoop requires (amongst others) pyzmq",
                            InitImportException)
 
-from scoop.__main__ import ScoopApp
+from scoop import __version__ as SCOOP_VERSION
+
+if LooseVersion(SCOOP_VERSION) >= LooseVersion('0.7'):
+    from scoop.launcher import ScoopApp
+else:
+    from scoop.__main__ import ScoopApp
+
 from scoop.launch import Host
 from scoop import utils
 
@@ -62,6 +68,11 @@ class MyHost(Host):
                                       'processcontrol', 'affinity',
                                       'variables']
                                      )
+
+    def __init__(self, *args, **kwargs):
+        super(MyHost, self).__init__(*args, **kwargs)
+        if not hasattr(self, 'log'):
+            self.log = getLogger('MyHost')
 
     def _WorkerCommand_environment(self, worker):
         c = super(MyHost, self)._WorkerCommand_environment(worker)
@@ -96,7 +107,6 @@ class MyHost(Host):
         return mod_load
 
     def _WorkerCommand_bootstrap(self, worker):
-        # nice will be passed as argument
         newworker = worker._replace(nice=None)  # worker is namedtuple instance
         c = super(MyHost, self)._WorkerCommand_bootstrap(newworker)
         return c
@@ -105,7 +115,7 @@ class MyHost(Host):
         c = super(MyHost, self)._WorkerCommand_options(worker, workerId)
         if worker.processcontrol is not None:
             self.log.debug("WorkerCommand_options worker %s processcontrol %s" %
-                           (worker.workerNum, worker.processcontrol))
+                           (worker.size, worker.processcontrol))
             c.extend(['--processcontrol', worker.processcontrol])
             if worker.nice is not None:
                 self.log.debug("WorkerCommand_options nice %s" % worker.nice)
@@ -121,8 +131,8 @@ class MyHost(Host):
                 self.log.error("affinity is set, but no processcontrol")
 
 
-        if worker.workerNum == 1 and worker.freeorigin:
-            self.log.debug("WorkerCommand_options freeorigin set for worker %s" % worker.workerNum)
+        if worker.size == 1 and worker.freeorigin:
+            self.log.debug("WorkerCommand_options freeorigin set for worker %s" % worker.size)
             c.append('--freeorigin')
 
         return c
@@ -337,27 +347,56 @@ class MYSCOOP(MPI):
             self.scoop_hosts.insert(origin_idx, self.scoop_hosts[origin_idx])
             self.scoop_size += 1
 
-        scoop_app_args = [[(nodename, len(list(group))) for nodename, group in itertools.groupby(self.scoop_hosts)],
-                          self.scoop_size,
-                          self.scoop_verbose,
-                          [self.scoop_python],
-                          self.scoop_broker,
-                          self.scoop_executable,
-                          self.scoop_args,
-                          self.scoop_tunnel,
-                          None,  # TODO args.log, deal with fancylogger later
-                          self.scoop_path,
-                          self.scoop_debug,
-                          self.scoop_nice,
-                          "other",  # TODO check utils.getEnv(),
-                          self.scoop_profile,
-                          self.scoop_pythonpath[0],
-                          # custom
-                          self.scoop_freeorigin,
-                          self.scoop_processcontrol,
-                          self.scoop_affinity,
-                          vars_to_pass,
-                          ]
+        if LooseVersion(SCOOP_VERSION) >= LooseVersion('0.7'):
+            scoop_app_args = [
+                [(nodename, len(list(group))) for nodename, group in itertools.groupby(self.scoop_hosts)],  # hosts
+                self.scoop_size,  # n
+                1,  # b (total number of brokers to spawn on the hosts, one by default)
+                self.scoop_verbose,  # verbose
+                [self.scoop_python],  # python_executable
+                self.scoop_broker,  # externalHostName
+                self.scoop_executable,  # executable
+                self.scoop_args,  # arguments
+                self.scoop_tunnel,  # tunnel
+                self.scoop_path,  # path
+                self.scoop_debug,  # debug
+                self.scoop_nice,  # nice
+                "other",  # env; TODO check utils.getEnv(),
+                self.scoop_profile,  # profile
+                self.scoop_pythonpath[0],  # pythonPath
+                [None],  # prolog (path to prolog script, default is None)
+                'ZMQ',  # backend (ZMQ or TCP, default: ZMQ)
+                #False, # rsh (default)  added in future version?
+                # custom
+                self.scoop_freeorigin,
+                self.scoop_processcontrol,
+                self.scoop_affinity,
+                vars_to_pass,
+            ]
+        else:
+            scoop_app_args = [
+                [(nodename, len(list(group))) for nodename, group in itertools.groupby(self.scoop_hosts)],  # hosts
+                self.scoop_size,  # n
+                self.scoop_verbose,  # verbose
+                [self.scoop_python],  # python_executable
+                self.scoop_broker,  # brokerHostName
+                self.scoop_executable,  # executable
+                self.scoop_args,  # arguments
+                self.scoop_tunnel,  # tunnel
+                None,  # log; TODO args.log, deal with fancylogger later
+                self.scoop_path,  # path
+                self.scoop_debug,  # debug
+                self.scoop_nice,  # nice
+                "other",  # env; TODO check utils.getEnv(),
+                self.scoop_profile,  # profile
+                self.scoop_pythonpath[0],  # pythonPath
+                # custom
+                self.scoop_freeorigin,
+                self.scoop_processcontrol,
+                self.scoop_affinity,
+                vars_to_pass,
+            ]
+
         self.log.debug("scoop_run: scoop_app class %s args %s" % (self.SCOOP_APP.__name__, scoop_app_args))
 
         scoop_app = self.SCOOP_APP(*scoop_app_args)

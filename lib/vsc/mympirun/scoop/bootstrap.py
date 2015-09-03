@@ -34,6 +34,7 @@ import runpy
 import sys
 import vsc.processcontrol
 from distutils.version import LooseVersion
+from scoop import __version__ as SCOOP_VERSION
 from scoop import futures
 from scoop.bootstrap.__main__ import Bootstrap
 from vsc.mympirun.scoop.worker_utils import set_scoop_env
@@ -57,12 +58,14 @@ class MyBootstrap(Bootstrap):
                                  default=None
                                  )
 
-        self.parser.add_argument('--nice',
-                                 help="Set this nice level",
-                                 action='store',
-                                 default=0,
-                                 type=int
-                                 )
+        if LooseVersion(SCOOP_VERSION) < LooseVersion('0.7'):
+            # --nice is already there in recent versions of SCOOP
+            self.parser.add_argument('--nice',
+                                     help="Set this nice level",
+                                     action='store',
+                                     default=0,
+                                     type=int
+                                     )
 
         self.parser.add_argument('--affinity',
                                  help="Affinity parameters",
@@ -122,7 +125,10 @@ class MyBootstrap(Bootstrap):
 
     def set_environment(self):
         """Set a number of worker environment variables"""
-        set_scoop_env('worker_name', self.args.workerName)
+        if LooseVersion(SCOOP_VERSION) < LooseVersion('0.7'):
+            set_scoop_env('worker_name', self.args.workerName)
+        else:
+            set_scoop_env('worker_name', self.args.externalBrokerHostname)
         set_scoop_env('worker_origin', int(self.args.origin))
 
     def run(self):
