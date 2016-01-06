@@ -70,6 +70,7 @@ class MyHost(Host):
                                      )
 
     def __init__(self, *args, **kwargs):
+        """Constructor; add logger if none is available"""
         super(MyHost, self).__init__(*args, **kwargs)
         if not hasattr(self, 'log'):
             self.log = getLogger('MyHost')
@@ -141,14 +142,13 @@ class MyHost(Host):
 class MyScoopApp(ScoopApp):
     LAUNCH_HOST_CLASS = MyHost
 
-    def __init__(self, *args):
-        args = list(args)  # args here is tuple, need to chaneg it (ie remove affintiy arg)
+    def __init__(self, *args, **kwargs):
         # remove custom options
-        self.variables_to_pass = args.pop()
-        self.affinity = args.pop()
-        self.processcontrol = args.pop()
-        self.freeorigin = args.pop()
-        super(MyScoopApp, self).__init__(*args)
+        self.variables_to_pass = kwargs.pop('variables_to_pass')
+        self.affinity = kwargs.pop('affinity')
+        self.processcontrol = kwargs.pop('processcontrol')
+        self.freeorigin = kwargs.pop('freeorigin')
+        super(MyScoopApp, self).__init__(*args, **kwargs)
 
     def _addWorker_args(self, workerinfo):
         args, kwargs = super(MyScoopApp, self)._addWorker_args(workerinfo)
@@ -347,55 +347,42 @@ class MYSCOOP(MPI):
             self.scoop_hosts.insert(origin_idx, self.scoop_hosts[origin_idx])
             self.scoop_size += 1
 
+        scoop_app_args = {
+            'arguments': self.scoop_args,
+            'debug': self.scoop_debug,
+            'env': "other", # TODO check utils.getEnv(),
+            'executable'`: self.scoop_executable,
+            'hosts': [(nodename, len(list(group))) for nodename, group in itertools.groupby(self.scoop_hosts)],
+            'n': self.scoop_size,
+            'nice': self.scoop_nice,
+            'path': self.scoop_path,
+            'profile': self.scoop_profile,
+            'python_executable': [self.scoop_python],
+            'pythonPath': self.scoop_pythonpath[0],
+            'tunnel': self.scoop_tunnel,
+            'verbose': self.scoop_verbose,
+        }
         if LooseVersion(SCOOP_VERSION) >= LooseVersion('0.7'):
-            scoop_app_args = [
-                [(nodename, len(list(group))) for nodename, group in itertools.groupby(self.scoop_hosts)],  # hosts
-                self.scoop_size,  # n
-                1,  # b (total number of brokers to spawn on the hosts, one by default)
-                self.scoop_verbose,  # verbose
-                [self.scoop_python],  # python_executable
-                self.scoop_broker,  # externalHostName
-                self.scoop_executable,  # executable
-                self.scoop_args,  # arguments
-                self.scoop_tunnel,  # tunnel
-                self.scoop_path,  # path
-                self.scoop_debug,  # debug
-                self.scoop_nice,  # nice
-                "other",  # env; TODO check utils.getEnv(),
-                self.scoop_profile,  # profile
-                self.scoop_pythonpath[0],  # pythonPath
-                [None],  # prolog (path to prolog script, default is None)
-                'ZMQ',  # backend (ZMQ or TCP, default: ZMQ)
-                #False, # rsh (default)  added in future version?
-                # custom
-                self.scoop_freeorigin,
-                self.scoop_processcontrol,
-                self.scoop_affinity,
-                vars_to_pass,
-            ]
+            scoop_app_args.update({
+                'b': 1,  # total number of brokers to spawn on the hosts, one by default
+                'externalHostName': self.scoop_broker,
+                'prolog': [None],  # path to prolog script, default is None
+                'backend': 'ZMQ',  # ZMQ or TCP, default: ZMQ
+                #'rsh': False, # added in future version (default: False)
+            })
         else:
-            scoop_app_args = [
-                [(nodename, len(list(group))) for nodename, group in itertools.groupby(self.scoop_hosts)],  # hosts
-                self.scoop_size,  # n
-                self.scoop_verbose,  # verbose
-                [self.scoop_python],  # python_executable
-                self.scoop_broker,  # brokerHostName
-                self.scoop_executable,  # executable
-                self.scoop_args,  # arguments
-                self.scoop_tunnel,  # tunnel
-                None,  # log; TODO args.log, deal with fancylogger later
-                self.scoop_path,  # path
-                self.scoop_debug,  # debug
-                self.scoop_nice,  # nice
-                "other",  # env; TODO check utils.getEnv(),
-                self.scoop_profile,  # profile
-                self.scoop_pythonpath[0],  # pythonPath
-                # custom
-                self.scoop_freeorigin,
-                self.scoop_processcontrol,
-                self.scoop_affinity,
-                vars_to_pass,
-            ]
+            scoop_app_args.update({
+                'brokerHostName': self.scoop_broker,
+                'log': None,  # TODO args.log, deal with fancylogger later
+            })
+
+        # custom
+        scoop_app_args.update({
+            'affinity': self.scoop_affinity,
+            'freeorigin': self.scoop_freeorigin,
+            'processcontrol': self.scoop_processcontrol,
+            'variables_to_pass': vars_to_pass,
+        })
 
         self.log.debug("scoop_run: scoop_app class %s args %s" % (self.SCOOP_APP.__name__, scoop_app_args))
 
