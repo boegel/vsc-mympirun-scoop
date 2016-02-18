@@ -365,7 +365,7 @@ class MYSCOOP(MPI):
         if LooseVersion(SCOOP_VERSION) >= LooseVersion('0.7'):
             scoop_app_args.update({
                 'b': 1,  # total number of brokers to spawn on the hosts, one by default
-                'externalHostName': self.scoop_broker,
+                'externalHostname': self.scoop_broker,
                 'prolog': [None],  # path to prolog script, default is None
                 'backend': 'ZMQ',  # ZMQ or TCP, default: ZMQ
                 #'rsh': False, # added in future version (default: False)
@@ -387,7 +387,7 @@ class MYSCOOP(MPI):
 
         self.log.debug("scoop_run: scoop_app class %s args %s" % (self.SCOOP_APP.__name__, scoop_app_args))
 
-        scoop_app = self.SCOOP_APP(*scoop_app_args)
+        scoop_app = self.SCOOP_APP(**scoop_app_args)
         try:
             root_task_ec = scoop_app.run()
             self.log.debug("scoop_run exited with exitcode %s" % root_task_ec)
