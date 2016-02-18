@@ -366,7 +366,7 @@ class MYSCOOP(MPI):
             scoop_app_args.update({
                 'b': 1,  # total number of brokers to spawn on the hosts, one by default
                 'externalHostname': self.scoop_broker,
-                'prolog': [None],  # path to prolog script, default is None
+                'prolog': None,  # path to prolog script, default is None
                 'backend': 'ZMQ',  # ZMQ or TCP, default: ZMQ
                 #'rsh': False, # added in future version (default: False)
             })
