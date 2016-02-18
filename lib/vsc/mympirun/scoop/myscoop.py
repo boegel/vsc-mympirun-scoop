@@ -31,6 +31,7 @@ SCOOP support
 import itertools
 import os
 import sys
+import traceback
 from collections import namedtuple
 from distutils.version import LooseVersion
 from vsc.utils.fancylogger import getLogger
@@ -75,6 +76,11 @@ class MyHost(Host):
         if not hasattr(self, 'log'):
             self.log = getLogger('MyHost')
 
+    def isLocal(self):
+        # force that environment is passed for all workers (including local ones)
+        # require because of 'module load' commands (don't play well with subprocess.Popen)
+        return False
+
     def _WorkerCommand_environment(self, worker):
         c = super(MyHost, self)._WorkerCommand_environment(worker)
 
@@ -82,8 +88,11 @@ class MyHost(Host):
         # TODO do we need the module load when we pass most variables?
 
         load_modules = self._WorkerCommand_environment_load_modules(worker.load_modules)
+        res = set_variables + load_modules + c
 
-        return set_variables + load_modules + c
+        self.log.debug("WorkerCommand_environment: %s" % res)
+
+        return res
 
     def _WorkerCommand_environment_set_variables(self, variables):
         # TODO port to env when super(MyHost, self)._WorkerCommand_environment(worker) does this
@@ -106,6 +115,7 @@ class MyHost(Host):
     def _WorkerCommand_bootstrap(self, worker):
         newworker = worker._replace(nice=None)  # worker is namedtuple instance
         c = super(MyHost, self)._WorkerCommand_bootstrap(newworker)
+
         return c
 
     def _WorkerCommand_options(self, worker, workerId):
@@ -145,7 +155,10 @@ class MyScoopApp(ScoopApp):
         self.affinity = kwargs.pop('affinity')
         self.processcontrol = kwargs.pop('processcontrol')
         self.freeorigin = kwargs.pop('freeorigin')
-        super(MyScoopApp, self).__init__(*args, **kwargs)
+        try:
+	        super(MyScoopApp, self).__init__(*args, **kwargs)
+        except Exception as err:
+	        print "ERROR: %s" % err
 
     def _addWorker_args(self, workerinfo):
         args, kwargs = super(MyScoopApp, self)._addWorker_args(workerinfo)
@@ -358,7 +371,7 @@ class MYSCOOP(MPI):
             'path': self.scoop_path,
             'profile': self.scoop_profile,
             'python_executable': [self.scoop_python],
-            'pythonPath': self.scoop_pythonpath[0],
+            'pythonPath': '',  #self.scoop_pythonpath[0],
             'tunnel': self.scoop_tunnel,
             'verbose': self.scoop_verbose,
         }
@@ -392,6 +405,8 @@ class MYSCOOP(MPI):
             root_task_ec = scoop_app.run()
             self.log.debug("scoop_run exited with exitcode %s" % root_task_ec)
         except Exception as e:
-            self.log.exception('scoop_run: error while launching SCOOP subprocesses: {0}'.format(str(e)))
+            print "Exception: %s" % e
+            print traceback.format_exc()
+            self.log.error('scoop_run: error while launching SCOOP subprocesses: {0}'.format(str(e)))
         finally:
             scoop_app.close()
