@@ -351,7 +351,7 @@ class MYSCOOP(MPI):
             'arguments': self.scoop_args,
             'debug': self.scoop_debug,
             'env': "other", # TODO check utils.getEnv(),
-            'executable'`: self.scoop_executable,
+            'executable': self.scoop_executable,
             'hosts': [(nodename, len(list(group))) for nodename, group in itertools.groupby(self.scoop_hosts)],
             'n': self.scoop_size,
             'nice': self.scoop_nice,
