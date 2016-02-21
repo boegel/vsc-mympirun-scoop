@@ -76,10 +76,10 @@ class MyHost(Host):
         if not hasattr(self, 'log'):
             self.log = getLogger('MyHost')
 
-    def isLocal(self):
+    #def isLocal(self):
         # force that environment is passed for all workers (including local ones)
         # require because of 'module load' commands (don't play well with subprocess.Popen)
-        return False
+        #return False
 
     def _WorkerCommand_environment(self, worker):
         c = super(MyHost, self)._WorkerCommand_environment(worker)
